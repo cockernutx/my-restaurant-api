@@ -1,0 +1,3 @@
+DEFINE TABLE OVERWRITE friends_with SCHEMAFULL TYPE RELATION IN users OUT users;
+
+# DEFINE FIELD OVERWRITE field ON friends_with;

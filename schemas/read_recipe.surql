@@ -1,0 +1,3 @@
+DEFINE TABLE OVERWRITE read_recipe SCHEMAFULL TYPE RELATION IN users OUT recipes;
+
+# DEFINE FIELD OVERWRITE field ON read_recipe;

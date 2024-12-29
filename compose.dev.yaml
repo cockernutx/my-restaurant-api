@@ -1,0 +1,29 @@
+services:
+  dev:
+    build: 
+      dockerfile: Containerfile.dev
+      context: .
+    env_file:
+      - .dev.env
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    user: root
+    restart: always
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    ports:
+      - "8452:8000"
+    command:
+      - start #start the SurrealDB server
+      - --log=trace #no idea what this does :(
+      - --user=root #default user
+      - --pass=root #default password
+      - surrealkv://database/db 
+    volumes:
+      - surrealdb_storage:/database
+  ollama:
+    image: ollama/ollama
+
+
+volumes:
+  surrealdb_storage:
