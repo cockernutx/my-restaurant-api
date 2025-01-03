@@ -1,11 +1,16 @@
-use crate::{auth::Claims, shared_types::CommonError, AppState, Pool};
-use aide::axum::{routing::post, ApiRouter};
+use crate::{
+    auth_operator::Claims,
+    shared_types::{CommonError, Record},
+    AppState, Pool,
+};
+use aide::axum::{routing::{patch, post}, ApiRouter};
 use axum::{extract::State, Json};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use surrealdb::{opt::PatchOp, RecordId};
 
 pub fn routes() -> ApiRouter<AppState> {
-    ApiRouter::new().api_route("/edit_bio", post(edit_bio))
+    ApiRouter::new().api_route("/edit_bio", patch(edit_bio))
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -18,11 +23,9 @@ async fn edit_bio(
     State(pool): State<Pool>,
     Json(bio_edit): Json<EditBioInput>,
 ) -> Result<(), CommonError> {
-    let resp = pool
-        .query(r#"UPDATE users SET bio = $new_bio WHERE username = $username"#)
-        .bind(("username", claims.sub))
-        .bind(("new_bio", bio_edit.new_bio))
+    let _: Option<Record> = pool
+        .update(RecordId::from_table_key("users", claims.sub))
+        .patch(PatchOp::replace("/bio", bio_edit.new_bio))
         .await?;
-    resp.check()?;
     Ok(())
 }

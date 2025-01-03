@@ -23,7 +23,8 @@
 				"vadimcn.vscode-lldb",
 				"tamasfe.even-better-toml",
 				"VisualStudioExptTeam.vscodeintellicode",
-				"rust-lang.rust-analyzer"
+				"rust-lang.rust-analyzer",
+				"ms-azuretools.vscode-azurefunctions"
 			]
 		}
 	}

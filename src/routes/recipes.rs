@@ -16,12 +16,17 @@ use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 use thiserror::Error;
 
-use crate::{auth::Claims, shared_types::Record, AppState, Pool};
+use crate::{
+    auth_operator::Claims,
+    shared_types::{CommonError, Record},
+    AppState, Pool,
+};
 
 pub fn routes() -> ApiRouter<AppState> {
     ApiRouter::new()
         .api_route("/new_recipe", post(new_recipe))
         .api_route("/:recipe_id", get(get_recipe))
+        .api_route("/recipe_list", get(get_recipes))
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -48,7 +53,7 @@ async fn new_recipe(
 ) -> Result<(StatusCode, String), NewRecipeError> {
     let mut query = pool
         .query(
-        r#"
+            r#"
         BEGIN TRANSACTION;
         LET $user = (SELECT id FROM users WHERE username = $username);
 
@@ -88,13 +93,21 @@ enum GetRecipeError {
     NotFound,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+struct GetRecipe {
+    recipe_id: String,
+}
+
 async fn get_recipe(
     State(pool): State<Pool>,
-    Path(recipe_id): Path<String>,
+    Path(get_recipe): Path<GetRecipe>,
 ) -> Result<Json<Recipe>, GetRecipeError> {
     let mut query = pool
         .query(r#"SELECT *, written_by.username AS written_by FROM $recipe"#)
-        .bind(("recipe", RecordId::from_table_key("recipes", recipe_id)))
+        .bind((
+            "recipe",
+            RecordId::from_table_key("recipes", get_recipe.recipe_id),
+        ))
         .await?;
     let recipe: Option<Recipe> = query.take(0)?;
     if let Some(recipe) = recipe {
@@ -102,4 +115,13 @@ async fn get_recipe(
     } else {
         Err(GetRecipeError::NotFound)
     }
+}
+
+async fn get_recipes(State(pool): State<Pool>) -> Result<Json<Vec<Recipe>>, CommonError> {
+    let mut query = pool
+        .query(r#"SELECT *, written_by.username AS written_by FROM recipes"#)
+        .await?;
+    let recipes: Vec<Recipe> = query.take(0)?;
+
+    Ok(Json(recipes))
 }

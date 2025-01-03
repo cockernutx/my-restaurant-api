@@ -3,8 +3,8 @@ use aide::{
     openapi::{Info, OpenApi},
     scalar::Scalar,
 };
-use auth::{Claims, KEYS};
-use axum::{extract::FromRef, Extension, Json};
+use auth_operator::{Claims, KEYS};
+use axum::{extract::FromRef, response::IntoResponse, Extension, Json};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, Header};
 use surrealdb::{
@@ -15,7 +15,7 @@ use surrealdb::{
 use tracing::{debug, info};
 
 mod routes;
-mod auth;
+mod auth_operator;
 mod shared_types;
 
 pub type Pool = Surreal<Client>;
@@ -34,7 +34,7 @@ impl FromRef<AppState> for Pool {
 // To be more efficient, we could wrap it into an Arc,
 // or even store it as a serialized string.
 async fn serve_api(Extension(api): Extension<OpenApi>) -> impl IntoApiResponse {
-    Json(api)
+    Json(api).into_response()
 }
 
 
@@ -72,9 +72,11 @@ async fn main() {
 
     let mut api = OpenApi {
         info: Info {
-            description: Some("an example API".to_string()),
+            title: "My restaurant API".to_string(),
+            description: Some("The my-restaurant API".to_string()),
             ..Info::default()
         },
+        openapi: "3.1.1".to_string().into(),
         ..OpenApi::default()
     };
 
@@ -100,5 +102,5 @@ async fn main() {
             .into_make_service(),
     )
     .await
-    .unwrap();
+    .unwrap()
 }

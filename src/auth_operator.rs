@@ -1,10 +1,6 @@
 use std::sync::LazyLock;
 
-use aide::{
-    openapi::{Parameter, ParameterData, Response, Responses, SchemaObject},
-    operation::add_parameters,
-    OperationInput,
-};
+use aide::{transform::TransformOperation, OperationInput};
 use axum::{async_trait, extract::FromRequestParts, http::request::Parts, RequestPartsExt};
 use axum_error_handler::AxumErrorResponse;
 use axum_extra::{
@@ -13,7 +9,7 @@ use axum_extra::{
 };
 use jsonwebtoken::{decode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+
 use thiserror::Error;
 
 const JWT_SECRET: &str = env!("JWT_SECRET");
@@ -38,14 +34,20 @@ impl Keys {
 pub enum AuthError {
     #[error("invalid token")]
     #[status_code("401")]
-    InvalidToken
+    InvalidToken,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
     pub exp: usize,
-    pub permissions: Vec<String>
+    pub permissions: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Refresher {
+    pub username: String,
+    pub exp: usize
 }
 
 #[async_trait]
@@ -62,18 +64,17 @@ where
             .await
             .map_err(|_| AuthError::InvalidToken)?;
         // Decode the user data
-                
+
         let token_data = decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())
             .map_err(|_| AuthError::InvalidToken)?;
-
 
         Ok(token_data.claims)
     }
 }
 
 impl OperationInput for Claims {
-    fn operation_input(ctx: &mut aide::gen::GenContext, operation: &mut aide::openapi::Operation) {
-        let s = ctx.schema.subschema_for::<String>();
+    fn operation_input(_ctx: &mut aide::gen::GenContext, operation: &mut aide::openapi::Operation) {
+        /*let s = ctx.schema.subschema_for::<String>();
         match &mut operation.responses {
             Some(responses) => {
                 responses.responses.insert(
@@ -95,28 +96,8 @@ impl OperationInput for Claims {
                 );
                 operation.responses = Some(responses);
             }
-        }
-        add_parameters(
-            ctx,
-            operation,
-            [Parameter::Header {
-                parameter_data: ParameterData {
-                    name: "Authorization".to_string(),
-                    description: Some("JWT received when authenticated.".to_string()),
-                    required: true,
-                    format: aide::openapi::ParameterSchemaOrContent::Schema(SchemaObject {
-                        json_schema: s,
-                        example: None,
-                        external_docs: None,
-                    }),
-                    extensions: Default::default(),
-                    deprecated: None,
-                    example: Some(json!("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")),
-                    examples: Default::default(),
-                    explode: None,
-                },
-                style: aide::openapi::HeaderStyle::Simple,
-            }],
-        );
+        }*/
+        let transform_openapi = TransformOperation::new(operation);
+        let _ = transform_openapi.security_requirement("BearerAuth");
     }
 }

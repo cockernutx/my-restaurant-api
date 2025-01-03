@@ -1,5 +1,6 @@
 FROM rust:latest
 
 RUN rustup component add rustfmt
-RUN cargo install cargo-watch
-RUN cargo install surrealdb-migrations
+RUN cargo install cargo-binstall
+RUN cargo binstall cargo-watch
+RUN cargo binstall surrealdb-migrations
