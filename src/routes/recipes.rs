@@ -1,6 +1,6 @@
 use aide::{
     axum::{
-        routing::{get, post},
+        routing::{get, post, post_with},
         ApiRouter,
     },
     OperationIo,
@@ -24,7 +24,7 @@ use crate::{
 
 pub fn routes() -> ApiRouter<AppState> {
     ApiRouter::new()
-        .api_route("/new_recipe", post(new_recipe))
+        .api_route("/new_recipe", post_with(new_recipe, |t| t.response_with::<201, String, _>(|t| t)))
         .api_route("/:recipe_id", get(get_recipe))
         .api_route("/recipe_list", get(get_recipes))
 }
@@ -77,6 +77,7 @@ async fn new_recipe(
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 struct Recipe {
+    pub id: String,
     pub title: String,
     pub recipe_markdown: String,
     pub recipe_image: Option<String>,
@@ -119,7 +120,7 @@ async fn get_recipe(
 
 async fn get_recipes(State(pool): State<Pool>) -> Result<Json<Vec<Recipe>>, CommonError> {
     let mut query = pool
-        .query(r#"SELECT *, written_by.username AS written_by FROM recipes"#)
+        .query(r#"SELECT *, written_by.username AS written_by, id.id() AS id FROM recipes"#)
         .await?;
     let recipes: Vec<Recipe> = query.take(0)?;
 
