@@ -10,6 +10,7 @@ axum = {version = "0.7.9", features = ["macros", "ws"]}
 axum-error-handler = "0.1.1"
 axum-extra = {version = "0.9.6", features = ["typed-header"]}
 chrono = {version = "0.4.39", features = ["serde"]}
+fastembed = "4.4.0"
 
 jsonwebtoken = "9.3.0"
 password-auth = "1.0.0"
