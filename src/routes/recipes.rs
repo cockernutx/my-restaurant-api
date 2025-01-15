@@ -15,6 +15,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 use thiserror::Error;
+use tracing::debug;
 
 use crate::{
     auth_operator::Claims,
@@ -44,27 +45,62 @@ enum NewRecipeError {
     #[error("recipe not created")]
     #[status_code("500")]
     NotCreated,
+    #[error("embedding error")]
+    #[status_code("500")]
+    EmbeddingError(#[from] fastembed::Error)
 }
 
 async fn new_recipe(
     claims: Claims,
-    State(pool): State<Pool>,
+    State(state): State<AppState>,
     Json(new_recipe): Json<NewRecipe>,
 ) -> Result<(StatusCode, String), NewRecipeError> {
+    let pool = &state.surreal;
+    let emb = &state.emb;
+
+    let documents: Vec<String> = {
+        let new_text = new_recipe.recipe_markdown.clone();
+        let paragraphs = new_text.lines();
+        let mut res: Vec<String> = vec![];
+
+        for line in paragraphs {
+            if line.len() < 10 {
+                if let Some(last) = res.last_mut() {
+                    *last += &format!("\n {line}");
+                    continue;
+                }
+            }
+            res.push(line.to_string());
+        }
+
+        res.insert(0, new_recipe.title.clone());
+
+        res
+    };
+
+    let embeddings = emb.embed(documents, None)?;
+
+
     let mut query = pool
         .query(
             r#"
         BEGIN TRANSACTION;
         LET $user = (SELECT id FROM users WHERE username = $username);
+        LET $recipe_content = (SELECT *, $user[0].id AS written_by, [] AS embeddings FROM $content)[0];
+        LET $recipe = CREATE recipes CONTENT $recipe_content;
+        LET $recipe_id = $recipe[0].id;
+        FOR $emb IN $embeddings {
+            LET $id = CREATE recipe_embeddings SET embeddings = $emb, refers_to = $recipe_id;
+            UPDATE $recipe_id SET embeddings += $id[0].id;
+        };
 
-        LET $recipe_content = (SELECT *, $user[0].id AS written_by FROM $content)[0];
-
-        RETURN CREATE recipes CONTENT $recipe_content;
+        RETURN (SELECT * FROM $recipe_id)
         COMMIT;
         "#,
         )
         .bind(("username", claims.sub))
         .bind(("content", new_recipe))
+        .bind(("embeddings",embeddings))
         .await?;
     let rec: Option<Record> = query.take(0)?;
     if let Some(rec) = rec {

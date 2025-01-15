@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use aide::{
     axum::{routing::get, ApiRouter, IntoApiResponse},
     openapi::{Info, OpenApi},
@@ -6,6 +8,7 @@ use aide::{
 use auth_operator::{Claims, KEYS};
 use axum::{extract::FromRef, response::IntoResponse, Extension, Json};
 use chrono::{Duration, Utc};
+use fastembed::{InitOptions, TextEmbedding};
 use jsonwebtoken::{encode, Header};
 use surrealdb::{
     engine::remote::ws::{Client, Ws},
@@ -22,7 +25,8 @@ pub type Pool = Surreal<Client>;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub surreal: Pool
+    pub surreal: Pool,
+    pub emb: Arc<TextEmbedding>
 }
 
 impl FromRef<AppState> for Pool {
@@ -58,10 +62,11 @@ async fn main() {
         .use_db("restaurant")
         .await
         .expect("could not switch to database context");
-
-
     
-    let state = AppState { surreal };
+    let emb = TextEmbedding::try_new(InitOptions::new(fastembed::EmbeddingModel::MxbaiEmbedLargeV1)).expect("could not load embeddings model");
+    let emb = Arc::new(emb);
+    
+    let state = AppState { surreal, emb };
 
     let app = ApiRouter::new()
         .route("/scalar", Scalar::new("/api.json").axum_route())
